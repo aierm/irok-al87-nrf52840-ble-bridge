@@ -1,0 +1,128 @@
+/*
+ * SPI: SCK P0.06, MISO P0.08, MOSI P0.17, CSN P0.20
+ * Power: TPS22919 ON P0.02, external VCC enable P0.13
+ * Input: active-low power button P0.29, battery divider P0.31/AIN7
+ */
+
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/adc/nrf-saadc.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/ {
+	external_vcc: external-vcc-control {
+		compatible = "power-switch";
+		gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+	};
+
+	keyboard_power: keyboard-power-control {
+		compatible = "power-switch";
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		power_button: power-button {
+			gpios = <&gpio0 29 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+		};
+	};
+
+	battery_sense: battery-sense {
+		compatible = "voltage-divider";
+		io-channels = <&adc 7>;
+		output-ohms = <1000000>;
+		full-ohms = <2000000>;
+	};
+};
+
+&adc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@7 {
+		reg = <7>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		/*
+		 * 1MΩ || 1MΩ gives a 500kΩ source impedance.  The capacitor at
+		 * AIN7 supplies the SAADC sampling pulse; 40us is the longest
+		 * acquisition time supported by the nRF52840 SAADC driver.
+		 */
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN7>;
+		zephyr,resolution = <12>;
+		/* Zephyr encodes oversampling as an exponent: 3 means 2^3 = 8 samples. */
+		zephyr,oversampling = <3>;
+	};
+};
+
+/*
+ * No gpio-hog on P0.02/P0.13.
+ *
+ * The rails used to be forced high before main() ran, which made any edge on
+ * P0.29 boot the whole keyboard -- a pocket brush was enough, and it left the
+ * power switch asymmetric (1 s hold to shut down, instant to start).
+ * power_manager_init() now brings the rails up only after the button has been
+ * held for POWER_BUTTON_ON_HOLD_MS, so charging works with the keyboard off.
+ */
+
+&pinctrl {
+	spi1_spis_default: spi1_spis_default {
+		group1 {
+			psels = <NRF_PSEL(SPIS_SCK, 0, 6)>,
+				<NRF_PSEL(SPIS_MISO, 0, 8)>,
+				<NRF_PSEL(SPIS_MOSI, 0, 17)>,
+				<NRF_PSEL(SPIS_CSN, 0, 20)>;
+		};
+	};
+
+	spi1_spis_sleep: spi1_spis_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIS_SCK, 0, 6)>,
+				<NRF_PSEL(SPIS_MISO, 0, 8)>,
+				<NRF_PSEL(SPIS_MOSI, 0, 17)>,
+				<NRF_PSEL(SPIS_CSN, 0, 20)>;
+			low-power-enable;
+		};
+	};
+};
+
+&spi1 {
+	compatible = "nordic,nrf-spis";
+	status = "okay";
+	def-char = <0x00>;
+	pinctrl-0 = <&spi1_spis_default>;
+	pinctrl-1 = <&spi1_spis_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+/* The board DTS enables several general-purpose peripherals by default.  This
+ * application only needs GPIO, SAADC, radio, and SPI1; leave the unused blocks
+ * disabled so their drivers do not configure pins or consume idle power. */
+&uart0 {
+	status = "disabled";
+};
+
+&i2c0 {
+	status = "disabled";
+};
+
+&i2c1 {
+	status = "disabled";
+};
+
+&pwm0 {
+	status = "disabled";
+};
+
+&spi2 {
+	status = "disabled";
+};
+
+&ieee802154 {
+	status = "disabled";
+};
+
+&usbd {
+	status = "disabled";
+};

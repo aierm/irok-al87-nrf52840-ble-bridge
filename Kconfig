@@ -1,0 +1,3 @@
+mainmenu "SPI HIDS keyboard bridge"
+
+source "Kconfig.zephyr"

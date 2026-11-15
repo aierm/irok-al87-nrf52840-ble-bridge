@@ -1,0 +1,9 @@
+description: GPIO-controlled external power switch
+
+compatible: "power-switch"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+    description: GPIO that enables the external power rail

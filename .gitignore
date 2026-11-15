@@ -1,0 +1,17 @@
+# Zephyr build outputs and cache
+build*/
+.zephyr_cache/
+
+# Archives and backup files
+*.zip
+*.tar.gz
+
+# Serial logs and debug text files
+*.log
+Log*.txt
+ttyACM*.txt
+*.patch
+
+# Agent prompts and devlog
+AGENTS*
+DEVLOG.md
